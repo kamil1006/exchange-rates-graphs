@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title> Currency weekly graph app</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
+          crossorigin="anonymous">
+
+    <style>
+        label, select, button{
+            margin: 5px;
+
+
+        }
+
+
+    </style>
+</head>
+
+<body>
+<h1> Next level- displaying graph</h1>
+<a>From: </a><a th:text="${wybor.fromSymbol}"></a>
+<a> To: </a><a th:text="${wybor.toSymbol}"></a>
+<hr>
+<div class="container" th:if="${daty != null}">
+    <form id="formularz1">
+    <div class="form-group">
+        <label for="selectJeden">From:</label>
+        <select class="form-control" id="selectJeden" >
+            <option th:each="datka : ${daty}" th:value="${datka}" th:text="${datka}"></option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="selectDwa">To:</label>
+        <select class="form-control" id="selectDwa" />
+            <option th:each="datka : ${daty}" th:value="${datka}" th:text="${datka}" th:selected="${datka == max_date.dataStr}"></option>
+        </select>
+    </div>
+
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+</div>
+<hr>
+
+<div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="" id="checkbox" checked>
+        <label class="form-check-label" >
+            Trend line
+        </label>
+        <p>Function: <a id="wzor_funkcji">y=ax+b</a></p>
+
+    </div>
+
+
+</div>
+<hr>
+<div id="curve_chart" style="width: 900px; height: 500px"></div>
+
+<hr>
+<! --------------------------------------------------------------- -->
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript">
+
+    google.charts.load('current', {'packages':['corechart']});
+    //google.charts.setOnLoadCallback(drawChart);
+
+    let dataOut = [];
+    let dataWithTrend = [];
+    let dataWitoutTrend = [];
+
+    var timeout;
+    let rise = '#27a82b';
+    let down = '#fc0f03';
+    let color ='';
+    let title ='';
+    let a = 0;
+    let b = 0;
+    data_od = "";
+    data_do = "";
+
+    document.addEventListener('DOMContentLoaded', function() {
+        //------------------------------------------------------
+        //console.log("---------   11111111  ----------");
+
+        getData2();
+        getData();
+        //console.log("---------   222222  ----------");
+
+        timeout = setInterval(function () {
+            if (google.visualization != undefined) {
+                //drawChart();
+                drawChart(dataOut);
+                clearInterval(timeout);
+            }
+        }, 300);
+
+        var checkbox = document.getElementById("checkbox");
+        checkbox.addEventListener('change', function() {
+           // oldChange();
+            newChange();
+
+        });
+
+        document.querySelector('#formularz1').onsubmit = function() {
+
+            from_data_value = document.querySelector('#selectJeden').value;
+            to_data_value = document.querySelector('#selectDwa').value;
+            //alert(from_data_value+" "+to_data_value);
+            const x = new Date(from_data_value);
+            const y = new Date(to_data_value);
+            if(x<y){
+                //alert("ok");
+                getDataFromRange();
+                drawChart(dataOut);
+            }
+            else {
+                alert(" nie ok");
+            }
+
+            return false;
+        };
+
+        return false;
+    });
+    //------------------------------------------------------
+
+    function getData(){
+/*
+        dataOut = [
+            ['week', 'course', 'trend'],
+            ['1',  1.16368, 1.15921],
+            ['2',  1.15987, 1.16076],
+            ['3',  1.15693, 1.1623],
+            ['4',  1.15937, 1.16384],
+            ['5',  1.17165, 1.16539]
+        ];
+
+*/
+        //console.log("---------   3333333333  ----------");
+
+
+        //drawChart(dataOut);
+
+
+    }
+    //------------------------------------------------------
+    function getData2(){
+
+        let data_od = document.getElementById("selectJeden").value;
+        let data_do = document.getElementById("selectDwa").value;
+        let mainTable = [];
+        let mainTableOhneTrend = [];
+
+        fetch('/get_initial_data', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                data_od: data_od,
+                data_do: data_do,
+
+            })
+        })
+            .then(response => response.json())
+            .then((data) => {
+                console.log(data);
+                //dataOut = data;
+                let tempTable =[];
+                let tempTable2 =[];
+                tempTable.push("datka");
+                tempTable.push("wartosc");
+                tempTable.push("linia trendu");
+                mainTable.push(tempTable);
+
+                tempTable2.push("datka");
+                tempTable2.push("wartosc");
+
+                mainTableOhneTrend.push(tempTable2);
+                let tt;
+                tt = data[0];
+                a =  parseFloat(tt[1]).toFixed(6);
+                tt = data[1];
+                b  = parseFloat(tt[1]).toFixed(6);
+                tt = data[2];
+                data_od  = tt[1];
+                tt = data[3];
+                data_do  = tt[1];
+
+                console.log(a);
+                console.log(b);
+                console.log(data_od);
+                console.log(data_do);
+
+                document.querySelector('#wzor_funkcji').innerHTML = 'y= '+a+' * x + '+b;
+                if(a > 0)
+                    color = rise;
+                else
+                    color = down;
+
+                title ='comparing currencies';
+
+                for (let i = 1+3; i < data.length; i++){
+                    let wpis = data[i];
+                    let datka = wpis[0];
+                    let wartosc =  parseFloat(wpis[1]);
+                    let funkcja =  parseFloat(wpis[2]);
+                    let tempTable =[];
+
+                    tempTable.push(datka);
+                    tempTable.push(wartosc);
+                    tempTable.push(funkcja);
+                    mainTable.push(tempTable);
+
+                    let tempTable2=[];
+                    tempTable2.push(datka);
+                    tempTable2.push(wartosc);
+                    mainTableOhneTrend.push(tempTable2);
+
+                }
+               // console.log(mainTable);
+                dataOut = mainTable;
+                dataWithTrend = mainTable;
+                dataWitoutTrend = mainTableOhneTrend;
+
+            })
+            .catch(error => {
+                console.log('Error:->', error);
+                return false;
+            });
+
+
+
+    }
+    //------------------------------------------------------
+    function drawChart(dataInput) {
+        // console.log("---------   44444444444  ----------");
+
+        var data = google.visualization.arrayToDataTable(dataInput);
+
+
+        var options = {
+            animation: {
+                startup: true,   /* Need to add this for animations */
+                duration: 1000,
+                easing: 'out',
+            },
+            title: title,
+            curveType: 'function',
+            legend: { position: 'bottom' },
+            colors: ['#032cfc', color]
+        };
+
+        var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
+
+        chart.draw(data, options);
+    }
+    //------------------------------------------------------
+    function oldChange(){
+        let ifChecked = document.querySelector('#checkbox').checked;
+        if(ifChecked){
+
+            dataOut = [
+                ['week', 'course', 'trend'],
+                ['1',  1.16368, 1.15921],
+                ['2',  1.15987, 1.16076],
+                ['3',  1.15693, 1.1623],
+                ['4',  1.15937, 1.16384],
+                ['5',  1.17165, 1.16539]
+            ];
+            drawChart(dataOut);
+
+        }else{
+
+            dataOut = [
+                ['week', 'course', ],
+                ['1',  1.16368],
+                ['2',  1.15987],
+                ['3',  1.15693],
+                ['4',  1.15937],
+                ['5',  1.17165]
+            ];
+            drawChart(dataOut);
+
+
+        }
+
+    }
+    //------------------------------------------------------
+    function newChange(){
+        let ifChecked = document.querySelector('#checkbox').checked;
+        if(ifChecked){
+
+            dataOut = dataWithTrend;
+            drawChart(dataOut);
+
+        }else{
+
+            dataOut = dataWitoutTrend;
+            drawChart(dataOut);
+
+
+        }
+
+    }
+    //------------------------------------------------------
+    function getDataFromRange(){
+        let data_od = document.getElementById("selectJeden").value;
+        let data_do = document.getElementById("selectDwa").value;
+        let mainTable = [];
+        let mainTableOhneTrend = [];
+
+        fetch('/get_range_data', {
+        //fetch('/get_initial_data', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                data_od: data_od,
+                data_do: data_do,
+
+            })
+        })
+            .then(response => response.json())
+            .then((data) => {
+                console.log(data);
+                //dataOut = data;
+                let tempTable =[];
+                let tempTable2 =[];
+                tempTable.push("datka");
+                tempTable.push("wartosc");
+                tempTable.push("linia trendu");
+                mainTable.push(tempTable);
+
+                tempTable2.push("datka");
+                tempTable2.push("wartosc");
+
+                mainTableOhneTrend.push(tempTable2);
+                let tt;
+                tt = data[0];
+                a =  parseFloat(tt[1]).toFixed(6);
+                tt = data[1];
+                b  = parseFloat(tt[1]).toFixed(6);
+                tt = data[2];
+                data_od  = tt[1];
+                tt = data[3];
+                data_do  = tt[1];
+
+                console.log(a);
+                console.log(b);
+                console.log(data_od);
+                console.log(data_do);
+
+                document.querySelector('#wzor_funkcji').innerHTML = 'y= '+a+' * x + '+b;
+                if(a > 0)
+                    color = rise;
+                else
+                    color = down;
+
+                title ='comparing currencies';
+
+                for (let i = 1+3; i < data.length; i++){
+                    let wpis = data[i];
+                    let datka = wpis[0];
+                    let wartosc =  parseFloat(wpis[1]);
+                    let funkcja =  parseFloat(wpis[2]);
+                    let tempTable =[];
+
+                    tempTable.push(datka);
+                    tempTable.push(wartosc);
+                    tempTable.push(funkcja);
+                    mainTable.push(tempTable);
+
+                    let tempTable2=[];
+                    tempTable2.push(datka);
+                    tempTable2.push(wartosc);
+                    mainTableOhneTrend.push(tempTable2);
+
+                }
+                // console.log(mainTable);
+                dataOut = mainTable;
+                dataWithTrend = mainTable;
+                dataWitoutTrend = mainTableOhneTrend;
+
+            })
+            .then(()=>{
+
+                drawChart(dataOut);
+
+            })
+            .catch(error => {
+                console.log('Error:->', error);
+                return false;
+            });
+
+
+
+    }
+    //------------------------------------------------------
+
+</script>
+<! --------------------------------------------------------------- -->
+</body>
+</html>
